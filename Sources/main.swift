@@ -7,6 +7,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var process: Process?
     private var selectedMode = "disable"
     private var items: [NSMenuItem] = []
+    private var settingsWindow: NSWindow?
+    private var startupCheckbox: NSButton?
+    private var updatingStartup = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // A second launch should not create another menu bar icon or assertion.
@@ -24,9 +27,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(item)
             items.append(item)
         }
+        menu.addItem(.separator())
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
         statusItem.menu = menu
         refresh()
         registerAtLogin()
+    }
+
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            let window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 300, height: 100),
+                styleMask: [.titled, .closable], backing: .buffered, defer: false
+            )
+            window.title = "Settings"
+            window.isReleasedWhenClosed = false
+            let checkbox = NSButton(checkboxWithTitle: "Boot on startup", target: self, action: #selector(toggleStartup(_:)))
+            checkbox.translatesAutoresizingMaskIntoConstraints = false
+            checkbox.toolTip = "Open CaffeinateBar automatically when you log in to your Mac."
+            let content = window.contentView!
+            content.addSubview(checkbox)
+            NSLayoutConstraint.activate([
+                checkbox.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 24),
+                checkbox.centerYAnchor.constraint(equalTo: content.centerYAnchor)
+            ])
+            startupCheckbox = checkbox
+            settingsWindow = window
+            window.center()
+        }
+        refreshStartupCheckbox()
+        NSApp.activate(ignoringOtherApps: true)
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    func applicationDidBecomeActive(_ notification: Notification) {
+        refreshStartupCheckbox()
+    }
+
+    private func refreshStartupCheckbox() {
+        startupCheckbox?.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        startupCheckbox?.isEnabled = !updatingStartup
+    }
+
+    @objc private func toggleStartup(_ sender: NSButton) {
+        guard !updatingStartup else { return }
+        let enable = sender.state == .on
+        updatingStartup = true
+        sender.isEnabled = false
+        Task { @MainActor in
+            defer {
+                updatingStartup = false
+                refreshStartupCheckbox()
+            }
+            do {
+                let service = SMAppService.mainApp
+                if enable {
+                    if service.status != .enabled && service.status != .requiresApproval {
+                        try service.register()
+                    }
+                    if service.status == .requiresApproval {
+                        SMAppService.openSystemSettingsLoginItems()
+                    }
+                } else if service.status == .enabled || service.status == .requiresApproval {
+                    try await service.unregister()
+                }
+                // Keep an explicit opt-out from being undone on the next launch.
+                UserDefaults.standard.set(true, forKey: "loginRegistrationCompleted")
+            } catch {
+                showError("Could not change startup setting", detail: error.localizedDescription)
+            }
+        }
     }
 
     @objc private func selectMode(_ sender: NSMenuItem) {

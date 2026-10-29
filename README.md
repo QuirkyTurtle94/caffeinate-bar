@@ -8,7 +8,7 @@ A tiny macOS menu bar app with three choices:
 - **caffeinate -i** — prevent idle system sleep, while allowing the display to sleep.
 - **Disable** — stop caffeinating.
 
-The cup fills when active. No Dock icon, settings window, or extra menus.
+The cup fills when active. No Dock icon. A small Settings window contains one startup checkbox.
 
 ## Install
 
@@ -33,7 +33,9 @@ Click the coffee cup in your menu bar and choose a mode. The app is built and si
 
 The app automatically registers to launch at login the first time you open it. If macOS asks, allow it in **System Settings → General → Login Items**. It starts with caffeinate **disabled** each time.
 
-Keep the installed app in the same location. To turn off automatic startup, disable CaffeinateBar in Login Items.
+Choose **Settings… → Boot on startup** in the coffee menu to turn automatic startup on or off. This means opening the app when you log in after booting. The checkbox reflects macOS’s current setting; if approval is needed, macOS Login Items opens.
+
+Keep the installed app in the same location. You can also manage automatic startup in macOS Login Items.
 
 ## Quit or uninstall
 
